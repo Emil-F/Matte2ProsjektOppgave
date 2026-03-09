@@ -109,10 +109,14 @@ for uIndex, u in enumerate(us):
 # Diagnose: sjekk at løsningen faktisk endrer seg
 print("Maks endring fra t0 til t1:", np.max(np.abs(us[0, 1, :] - us[0, 0, :])))
 
-fig, axs = plt.subplots(1, 3, figsize=(16, 4))
+fig, axs = plt.subplots(2, 2, figsize=(10, 6))
 colors = ["g", "b", "r"]
 
 for i, ax in enumerate(axs.flatten()):
+    if i > len(ps)-1:
+        ax.axis("off")
+        break
+
     # Faste aksegrenser (som i eksempelet)
     ax.set_xlim(0, 5)
     ax.set_ylim(-1000, 1000)
@@ -121,19 +125,27 @@ for i, ax in enumerate(axs.flatten()):
     ax.set_ylabel("P(t)")
     ax.set_title(f"Numerisk løsning av K(t) for p={ps[i]}")
 
-    bakersteBilx = np.zeros(t_grid.size)
+    bakersteBilx = []
 
     for tIndex in range(len(t_grid)):
+        complete = False
+
         for uIndex in range(1, len(us[i, tIndex, :])):
             if (us[i, tIndex, uIndex] < umax):
-                bakersteBilx[tIndex] = x_grid[uIndex]
+                if x_grid[uIndex] == x_grid[1]:
+                    break
+                bakersteBilx.append(x_grid[uIndex])
                 break
+        if complete:
+            break
     
-    print(f"bakerste bil {bakersteBilx}")
+    K = np.array(bakersteBilx)
+    
+    print(f"p={ps[i]}: alle bilene er i bevegelse ved t={t_grid[len(K)]}")
 
-    ax.plot(t_grid, bakersteBilx, label=f"P(t) for p={ps[i]}", color=colors[i])
+    ax.plot(t_grid[:len(K)], K, label=f"K(t) for p={ps[i]}", color=colors[i])
+    ax.legend()
 
 
-ax.legend()
 plt.tight_layout()
 plt.show()
