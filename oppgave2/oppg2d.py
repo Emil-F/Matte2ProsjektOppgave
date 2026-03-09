@@ -3,25 +3,21 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from IPython.display import HTML
 
-# ------------------------------------------------------------
-# Oppsett for figurer (nyttig i notater for å unngå "gamle" plott)
-# ------------------------------------------------------------
+# Lukker gamle plott
 plt.close("all")
-plt.figure(figsize=(6, 4))
 
 vmax = 22
 umax = 1/5
 ps = [1, 2, 5]
 
 # ------------------------------------------------------------
-# Fluks for Burgers' ligning: u_t + (f(u))_x = 0, der f(u) = u^2/2
+# Fluks for trafikk ligning: u_t + (J(u))_x = 0, der J(u) = u * v(u)
+# v(u) = v_max * (1 - (u/u_max)^p)
 # ------------------------------------------------------------
 def flux_burgers(u, p):
-    """Fluksen f(u) for Burgers' ligning."""
-    u_safe = np.clip(u, 0, umax)  # Prevent overflow
+    u_safe = np.clip(u, 0, umax)  # Unngår at programmet ikke krasjer hvis u blir ustabil
     return u_safe * vmax * (1 - (u_safe/umax)**p)
     
-
 
 # ------------------------------------------------------------
 # Lax–Friedrichs-metoden (1D, eksplisitt)
@@ -68,16 +64,6 @@ dt = t_grid[1] - t_grid[0]
 dx = x_grid[1] - x_grid[0]
 
 
-
-
-
-plt.close("all")
-
-# ------------------------------------------------------------
-# Vindu 2: Sett initialbetingelse, løs med Lax–Friedrichs, og animer
-# Forutsetter at vindu 1 allerede er kjørt (x_grid, t_grid, dx, dt, osv.)
-# ------------------------------------------------------------
-
 # Randbetingelser (Dirichlet)
 def u_left(t):
     """Venstre randverdi u(a,t)."""
@@ -90,53 +76,54 @@ def u_right(t):
 # Initialbetingelse u(x,0)
 u0 = np.piecewise(x_grid, [x_grid <= 0, x_grid > 0], [lambda x: umax, lambda x: 0])
 
-# CFL-sjekk (pedagogisk)
+# CFL-sjekk
 cfl = (dt / dx) * np.max(np.abs(u0))
 print("max|u0| =", np.max(np.abs(u0)))
 print("CFL ~ (dt/dx)*max|u0| =", cfl)
 
-# Lagrer løsningen for alle tider (greit for animasjon)
+# Lagrer u0 løsningen for alle tider
 us = np.zeros((len(ps), t_grid.size, x_grid.size))
 us[:, 0, :] = u0
 
-# Tidsløkken
-for uIndex, u in enumerate(us):
+# Setter verdier for u i alle posijoner og tidspunkter for hver verdi av p
+for index, u in enumerate(us):
     for n_step in range(1, t_grid.size):
         t_now = t_grid[n_step - 1]
         u[n_step, :] = lax_friedrichs_step(
-            flux_burgers, u[n_step - 1, :], ps[uIndex], dx, dt, t_now, u_left, u_right
+            flux_burgers, u[n_step - 1, :], ps[index], dx, dt, t_now, u_left, u_right
         )
 
-# Diagnose: sjekk at løsningen faktisk endrer seg
-print("Maks endring fra t0 til t1:", np.max(np.abs(us[0, 1, :] - us[0, 0, :])))
+# ------------------------------------------------------------
+# Animasjon
+# ------------------------------------------------------------
 
-#----------------------------------------------------------------------
-# 
-
+# Finner hastigheten til en bil ut ifra tettheten
 def v(u, p):
-    u_safe = np.clip(u, 0, umax)  # Prevent overflow
+    u_safe = np.clip(u, 0, umax)  # Unngår at programmet ikke krasjer hvis u blir ustabil
     return vmax * (1 - (u_safe/umax)**p)
 
 def u_at_position(u_row, x):
     """Tetthet u(x,t) ved posisjon x ved lineær interpolasjon på x_grid."""
     return np.interp(x, x_grid, u_row)
 
-colors = ["g", "b", "r"]
 
 fig, (axP, axV) = plt.subplots(2, 1, figsize=(6, 6))
+colors = ["g", "b", "r"]
 
+# Plotter et subplot for hver verdi av p
 for i in range(len(ps)):
     P = np.zeros(t_grid.size)
     V = np.zeros(t_grid.size)
 
     P[0] = -900
 
+    # Finner verdiene for P (posisjon) og V (hastighet)
     for n in range(1, t_grid.size):
         P[n] = P[n-1] + dt * V[n-1]
         u_point = u_at_position(us[i, n, :], P[n])
         V[n] = v(u_point, ps[i])
 
-    # Faste aksegrenser (som i eksempelet)
+    # Faste aksegrenser
     axP.set_xlim(t_grid[0], t_grid[-1])
     axP.set_ylim(np.min(P), 1000)
 
@@ -148,7 +135,7 @@ for i in range(len(ps)):
     axP.plot(t_grid, P, label=f"P(t) for p={ps[i]}", color=colors[i])
 
 
-    # Faste aksegrenser (som i eksempelet)
+    # Faste aksegrenser
     axV.set_xlim(t_grid[0], t_grid[-1])
     axV.set_ylim(0, 40)
 
@@ -156,7 +143,6 @@ for i in range(len(ps)):
     axV.set_ylabel("V(t)")
     axV.set_title("Numerisk løsning av V(t)")
 
-    # Rød stiplet: startprofil
     axV.plot(t_grid, V, label=f"V(t) for p={ps[i]}", color=colors[i])
 
 axP.legend()
