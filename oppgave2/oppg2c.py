@@ -3,24 +3,20 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from IPython.display import HTML
 
-# ------------------------------------------------------------
-# Oppsett for figurer (nyttig i notater for å unngå "gamle" plott)
-# ------------------------------------------------------------
+# Lukker gamle plott
 plt.close("all")
-plt.figure(figsize=(6, 4))
 
 vmax = 22
 umax = 1/5
 ps = [1, 2, 5]
 
 # ------------------------------------------------------------
-# Fluks for Burgers' ligning: u_t + (f(u))_x = 0, der f(u) = u^2/2
+# Fluks for trafikk ligning: u_t + (J(u))_x = 0, der J(u) = u * v(u)
+# v(u) = v_max * (1 - (u/u_max)^p)
 # ------------------------------------------------------------
-def flux_burgers(u, p):
-    """Fluksen f(u) for Burgers' ligning."""
+def flux_trafikk(u, p):
     return u * vmax * (1 - (u/umax)**p)
     
-
 
 # ------------------------------------------------------------
 # Lax–Friedrichs-metoden (1D, eksplisitt)
@@ -67,16 +63,6 @@ dt = t_grid[1] - t_grid[0]
 dx = x_grid[1] - x_grid[0]
 
 
-
-
-
-plt.close("all")
-
-# ------------------------------------------------------------
-# Vindu 2: Sett initialbetingelse, løs med Lax–Friedrichs, og animer
-# Forutsetter at vindu 1 allerede er kjørt (x_grid, t_grid, dx, dt, osv.)
-# ------------------------------------------------------------
-
 # Randbetingelser (Dirichlet)
 def u_left(t):
     """Venstre randverdi u(a,t)."""
@@ -89,34 +75,33 @@ def u_right(t):
 # Initialbetingelse u(x,0)
 u0 = np.piecewise(x_grid, [x_grid <= 0, x_grid > 0], [lambda x: umax, lambda x: 0])
 
-# CFL-sjekk (pedagogisk)
+# CFL-sjekk
 cfl = (dt / dx) * np.max(np.abs(u0))
 print("max|u0| =", np.max(np.abs(u0)))
 print("CFL ~ (dt/dx)*max|u0| =", cfl)
 
-# Lagrer løsningen for alle tider (greit for animasjon)
+# Lagrer u0 løsningen for alle tider
 us = np.zeros((len(ps), t_grid.size, x_grid.size))
 us[:, 0, :] = u0
 
-# Tidsløkken
+# Setter verdier for u i alle posijoner og tidspunkter for hver verdi av p
 for uIndex, u in enumerate(us):
     for n_step in range(1, t_grid.size):
         t_now = t_grid[n_step - 1]
         u[n_step, :] = lax_friedrichs_step(
-            flux_burgers, u[n_step - 1, :], ps[uIndex], dx, dt, t_now, u_left, u_right
+            flux_trafikk, u[n_step - 1, :], ps[uIndex], dx, dt, t_now, u_left, u_right
         )
 
-# Diagnose: sjekk at løsningen faktisk endrer seg
-print("Maks endring fra t0 til t1:", np.max(np.abs(us[0, 1, :] - us[0, 0, :])))
 
 # ------------------------------------------------------------
 # Animasjon
 # ------------------------------------------------------------
+
 fig, axs = plt.subplots(1, len(us), figsize=(16, 4))
 lines = []
 
+# Plotter et subplot for hver verdi av p
 for i, ax in enumerate(axs.flatten()):
-    # Faste aksegrenser (som i eksempelet)
     ax.set_xlim(x_grid[0], x_grid[-1])
     ax.set_ylim(np.min(us[i]), np.max(us[i]))
 
@@ -133,11 +118,13 @@ for i, ax in enumerate(axs.flatten()):
 
     ax.legend()
 
+# Setter y hverdier for hvert subplot
 def animate(i):
     for lineIndex, line in enumerate(lines):
         line.set_ydata(us[lineIndex, i, :])
     return lines
 
+# Animerer funksjonen
 ani = animation.FuncAnimation(
     fig,
     animate,

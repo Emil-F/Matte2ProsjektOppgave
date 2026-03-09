@@ -1,26 +1,20 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.animation as animation
-from IPython.display import HTML
 
-# ------------------------------------------------------------
-# Oppsett for figurer (nyttig i notater for å unngå "gamle" plott)
-# ------------------------------------------------------------
+# Lukker gamle plott
 plt.close("all")
-plt.figure(figsize=(6, 4))
 
 vmax = 22
 umax = 1/5
 ps = [1, 2, 5]
 
 # ------------------------------------------------------------
-# Fluks for Burgers' ligning: u_t + (f(u))_x = 0, der f(u) = u^2/2
+# Fluks for trafikk ligning: u_t + (J(u))_x = 0, der J(u) = u * v(u)
+# v(u) = v_max * (1 - (u/u_max)^p)
 # ------------------------------------------------------------
-def flux_burgers(u, p):
-    """Fluksen f(u) for Burgers' ligning."""
+def flux_trafikk(u, p):
     return u * vmax * (1 - (u/umax)**p)
     
-
 
 # ------------------------------------------------------------
 # Lax–Friedrichs-metoden (1D, eksplisitt)
@@ -67,16 +61,6 @@ dt = t_grid[1] - t_grid[0]
 dx = x_grid[1] - x_grid[0]
 
 
-
-
-
-plt.close("all")
-
-# ------------------------------------------------------------
-# Vindu 2: Sett initialbetingelse, løs med Lax–Friedrichs, og animer
-# Forutsetter at vindu 1 allerede er kjørt (x_grid, t_grid, dx, dt, osv.)
-# ------------------------------------------------------------
-
 # Randbetingelser (Dirichlet)
 def u_left(t):
     """Venstre randverdi u(a,t)."""
@@ -89,30 +73,36 @@ def u_right(t):
 # Initialbetingelse u(x,0)
 u0 = np.piecewise(x_grid, [x_grid <= 0, x_grid > 0], [lambda x: umax, lambda x: 0])
 
-# CFL-sjekk (pedagogisk)
+# CFL-sjekk
 cfl = (dt / dx) * np.max(np.abs(u0))
 print("max|u0| =", np.max(np.abs(u0)))
 print("CFL ~ (dt/dx)*max|u0| =", cfl)
 
-# Lagrer løsningen for alle tider (greit for animasjon)
+# Lagrer u0 løsningen for alle tider
 us = np.zeros((len(ps), t_grid.size, x_grid.size))
 us[:, 0, :] = u0
 
-# Tidsløkken
+# Setter verdier for u i alle posijoner og tidspunkter for hver verdi av p
 for uIndex, u in enumerate(us):
     for n_step in range(1, t_grid.size):
         t_now = t_grid[n_step - 1]
         u[n_step, :] = lax_friedrichs_step(
-            flux_burgers, u[n_step - 1, :], ps[uIndex], dx, dt, t_now, u_left, u_right
+            flux_trafikk, u[n_step - 1, :], ps[uIndex], dx, dt, t_now, u_left, u_right
         )
 
-# Diagnose: sjekk at løsningen faktisk endrer seg
-print("Maks endring fra t0 til t1:", np.max(np.abs(us[0, 1, :] - us[0, 0, :])))
 
-fig, axs = plt.subplots(1, 3, figsize=(16, 4))
+# ------------------------------------------------------------
+# Animasjon
+# ------------------------------------------------------------
+
+fig, axs = plt.subplots(2, 2, figsize=(10, 6))
 colors = ["g", "b", "r"]
 
 for i, ax in enumerate(axs.flatten()):
+    if i > len(ps)-1:
+        ax.axis("off")
+        break
+
     # Faste aksegrenser (som i eksempelet)
     ax.set_xlim(0, 5)
     ax.set_ylim(-1000, 1000)
@@ -121,19 +111,31 @@ for i, ax in enumerate(axs.flatten()):
     ax.set_ylabel("P(t)")
     ax.set_title(f"Numerisk løsning av K(t) for p={ps[i]}")
 
-    bakersteBilx = np.zeros(t_grid.size)
+    bakersteBilx = []
 
+    # finner posisjonen til den bakeste bilen som beveger seg
+    # slutter å kjøre når alle bilene beveger seg
     for tIndex in range(len(t_grid)):
+        complete = False
         for uIndex in range(1, len(us[i, tIndex, :])):
             if (us[i, tIndex, uIndex] < umax):
-                bakersteBilx[tIndex] = x_grid[uIndex]
+                if uIndex == 1:
+                    complete = True
+                    break
+
+                bakersteBilx.append(x_grid[uIndex])
                 break
+            
+        if complete:
+            break
     
-    print(f"bakerste bil {bakersteBilx}")
+    K = np.array(bakersteBilx)
+    
+    print(f"p={ps[i]}: alle bilene er i bevegelse ved t={t_grid[len(K)]}")
 
-    ax.plot(t_grid, bakersteBilx, label=f"P(t) for p={ps[i]}", color=colors[i])
+    ax.plot(t_grid[:len(K)], K, label=f"K(t) for p={ps[i]}", color=colors[i])
+    ax.legend()
 
 
-ax.legend()
 plt.tight_layout()
 plt.show()
