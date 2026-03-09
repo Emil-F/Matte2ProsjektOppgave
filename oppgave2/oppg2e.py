@@ -119,7 +119,7 @@ for i, ax in enumerate(axs.flatten()):
 
     ax.set_xlabel("t")
     ax.set_ylabel("P(t)")
-    ax.set_title("Numerisk løsning av P(t)")
+    ax.set_title(f"Numerisk løsning av K(t) for p={ps[i]}")
 
     bakersteBilx = np.zeros(t_grid.size)
 
